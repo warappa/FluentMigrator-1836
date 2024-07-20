@@ -4,6 +4,9 @@ using FluentMigrator.Runner.VersionTableInfo;
 using FluentMigrator;
 using System.Data.SQLite;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using FluentMigrator.Runner.Conventions;
+using Microsoft.Extensions.Options;
+using FluentMigrator.Runner.Initialization;
 
 Console.WriteLine("FluentMigrator 1836 repo");
 Console.WriteLine("---------------------");
@@ -50,6 +53,7 @@ if (!registerTooEarly)
 // Adding an implementation only if non is yet found is more graceful.
 // Here's a demo of only registering a service if it is not yet registered in service collection.
 // Add first service - in *user's* code.
+services.AddScoped<ISomeLibraryInterface, AnotherUserImplementation>();
 services.AddScoped<ISomeLibraryInterface, UserImplementation>();
 
 // A library (like FluentMigrator) only tries to add a default implementation if it was not yet registered before.
@@ -89,7 +93,13 @@ using (var scope = serviceProvider.CreateScope())
     Console.WriteLine("Give user DI registration priority");
     Console.WriteLine("Demo of giving user registered services priority by using 'TryAdd...' in library code.");
     Console.WriteLine("Resolved value should be 'UserImplementation', although registered before library's registrations.");
+    Console.WriteLine();
     Console.WriteLine($"Resolved instance type: {test.GetType().Name}");
+
+    var allRegisteredServices = scope.ServiceProvider.GetRequiredService<IEnumerable<ISomeLibraryInterface>>();
+    Console.WriteLine();
+    Console.WriteLine("Multiple registered services are registered, but the LAST registered one wins when using 'GetRequiredService(...)'");
+    Console.WriteLine($"All registered services for the interface:\n - {string.Join("\n - ", allRegisteredServices.Select(x => x.GetType().Name))}");
 }
 
 static bool TableExists(SQLiteCommand command, string tableName)
@@ -101,6 +111,18 @@ static bool TableExists(SQLiteCommand command, string tableName)
 
 public class CustomVersionMetaData : DefaultVersionTableMetaData
 {
+    public CustomVersionMetaData()
+    {
+    }
+
+    public CustomVersionMetaData(string schemaName) : base(schemaName)
+    {
+    }
+
+    public CustomVersionMetaData(IConventionSet conventionSet, IOptions<RunnerOptions> runnerOptions) : base(conventionSet, runnerOptions)
+    {
+    }
+
     public override string TableName => "CustomVersionInfo";
 }
 
@@ -130,6 +152,11 @@ public class DefaultLibraryImplementation : ISomeLibraryInterface
 }
 
 public class UserImplementation : ISomeLibraryInterface
+{
+
+}
+
+public class AnotherUserImplementation : ISomeLibraryInterface
 {
 
 }
